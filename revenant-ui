@@ -947,7 +947,8 @@ function insidewindow:Slider(Info)
     Info.Minimum = Info.Minimum or 1
     Info.Default = Info.Default or 5
     Info.Maximum = Info.Maximum or 100
-    Info.Decimals = Info.Decimals or 0  -- NEW: Number of decimal places (0 for integers)
+    -- NEW: Added Precision (defaults to 2 decimal places)
+    Info.Precision = Info.Precision or 2 
     Info.Callback = Info.Callback or function() end
     
     if Info.Minimum > Info.Maximum then
@@ -960,6 +961,13 @@ function insidewindow:Slider(Info)
 
     local insideslider = {}
     
+    -- Helper function to round to specific decimal places
+    local function Round(Number, Precision)
+        local Shift = 10 ^ Precision
+        return math.floor(Number * Shift + 0.5) / Shift
+    end
+    
+    -- UI Setup (Unchanged from your original code, minus the math.floor logic later)
     local slider = Instance.new("Frame")
     slider.Name = "Slider"
     slider.BackgroundColor3 = Color3.fromRGB(36, 36, 36)
@@ -1055,7 +1063,7 @@ function insidewindow:Slider(Info)
     local sliderValueText = Instance.new("TextLabel")
     sliderValueText.Name = "SliderValueText"
     sliderValueText.Font = Enum.Font.GothamBold
-    sliderValueText.Text = string.format("%." .. Info.Decimals .. "f", Info.Default) .. Info.Postfix
+    sliderValueText.Text = tostring(Info.Default)..Info.Postfix
     sliderValueText.TextColor3 = Color3.fromRGB(214, 214, 214)
     sliderValueText.TextSize = 13
     sliderValueText.TextXAlignment = Enum.TextXAlignment.Right
@@ -1065,7 +1073,8 @@ function insidewindow:Slider(Info)
     sliderValueText.Size = UDim2.fromOffset(198, 19)
     sliderValueText.Parent = slider
 
-    pcall(Info.Callback, Info.Default)
+    -- Run callback with the default (ensuring it's rounded first)
+    pcall(Info.Callback, Round(Info.Default, Info.Precision))
 
     slider.MouseEnter:Connect(function()
         sliderFixLine.BackgroundColor3 = Color3.fromRGB(44, 44, 44)
@@ -1083,28 +1092,25 @@ function insidewindow:Slider(Info)
     local SizeFromScale = (MinSize +  (MaxSize - MinSize)) * DefaultScale
     SizeFromScale = SizeFromScale - (SizeFromScale % 2)
 
-    -- Helper function to round to specified decimal places
-    local function roundToDecimals(num, decimals)
-        local mult = 10^decimals
-        return math.floor(num * mult + 0.5) / mult
-    end
-
     dragSliderButton.MouseButton1Down:Connect(function()
         local MouseMove, MouseKill
         MouseMove = Mouse.Move:Connect(function()
             local Px = library:GetXY(outerSlider)
-            local SizeFromScale = (MinSize +  (MaxSize - MinSize)) * Px
             
-            -- Calculate value with decimals
-            local Value = Info.Minimum + ((Info.Maximum - Info.Minimum) * Px)
-            Value = roundToDecimals(Value, Info.Decimals)
+            -- Calculate the raw decimal value
+            local RawValue = Info.Minimum + ((Info.Maximum - Info.Minimum) * Px)
             
+            -- Round the value to the specific precision (e.g., 2 decimal places)
+            local Value = Round(RawValue, Info.Precision)
+            
+            SizeFromScale = (MinSize +  (MaxSize - MinSize)) * Px
             SizeFromScale = SizeFromScale - (SizeFromScale % 2)
+            
             TweenService:Create(innerSlider, TweenInfo.new(0.1), {Size = UDim2.new(Px,0,0,4)}):Play()
             TweenService:Create(dragSlider, TweenInfo.new(0.1), {Position = UDim2.new(Px,-4,0,2)}):Play()
             
-            -- Format the text with specified decimal places
-            sliderValueText.Text = string.format("%." .. Info.Decimals .. "f", Value) .. Info.Postfix
+            -- Update text and callback with the rounded decimal value
+            sliderValueText.Text = tostring(Value)..Info.Postfix
             pcall(Info.Callback, Value)
         end)
         MouseKill = UserInputService.InputEnded:Connect(function(UserInput)
